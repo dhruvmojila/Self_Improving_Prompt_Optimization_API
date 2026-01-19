@@ -1,0 +1,52 @@
+# Web Framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.7.0
+pydantic-settings>=2.2.1
+python-multipart>=0.0.9
+
+# AI Core - Optimization Engine
+dspy-ai>=2.4.0
+
+# AI Core - Evaluation Framework
+langchain>=0.1.15
+langchain-google-genai>=1.0.0
+langchain-groq>=0.1.0
+langsmith>=0.1.0
+
+# Data Infrastructure
+pixeltable>=0.2.0
+
+# Task Queue
+celery>=5.3.0
+redis>=5.0.0
+
+# Data Science & Metrics
+numpy>=1.26.0
+pandas>=2.2.0
+scikit-learn>=1.4.0
+scipy>=1.12.0
+rouge-score>=0.1.2
+
+# LLM Providers
+openai>=1.30.0
+google-genai>=1.57.0
+groq>=0.5.0
+
+# Utilities
+python-dotenv>=1.0.0
+tenacity>=8.2.3
+click>=8.1.7
+
+# Text Processing
+textstat>=0.7.3
+
+# Type Checking (Development)
+mypy>=1.9.0
+types-redis>=4.6.0
+
+# Testing
+pytest>=8.1.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
+httpx>=0.27.0
