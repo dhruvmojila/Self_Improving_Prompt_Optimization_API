@@ -1,0 +1,51 @@
+{
+  "predictor.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "text": "I love this product!",
+        "reasoning": "The customer expresses a strong positive emotion (\"I love\") towards the product, indicating a high level of satisfaction.",
+        "sentiment": "positive"
+      },
+      {
+        "augmented": true,
+        "text": "This is terrible quality.",
+        "reasoning": "The text explicitly states that the quality is \"terrible\", which is a strong negative adjective, indicating a negative sentiment towards the product.",
+        "sentiment": "negative"
+      },
+      {
+        "augmented": true,
+        "text": "It's okay, nothing special.",
+        "reasoning": "The text expresses a neutral opinion, stating that the subject is \"okay\" but also implying a lack of enthusiasm or strong feelings by saying it's \"nothing special\".",
+        "sentiment": "neutral"
+      }
+    ],
+    "signature": {
+      "instructions": "Simple sentiment classification",
+      "fields": [
+        {
+          "prefix": "Text:",
+          "description": "${text}"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Sentiment:",
+          "description": "${sentiment}"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.1.0",
+      "cloudpickle": "3.1"
+    }
+  }
+}

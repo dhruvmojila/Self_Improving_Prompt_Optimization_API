@@ -28,9 +28,9 @@ async def start_optimization(
     db: PixeltableClient = Depends(get_db)
 ):
     """
-    Start an optimization job.
+    Start an async optimization job.
     
-    This triggers a long-running async task that will:
+    Dispatches a Celery task that will:
     1. Load the baseline prompt and dataset
     2. Run DSPy optimizer (Bootstrap or MIPRO)
     3. Evaluate candidates on dev set
@@ -66,11 +66,36 @@ async def start_optimization(
     event_bus.update_job_progress(
         job_id=job_id,
         status=OptimizationStatus.PENDING,
-        message="Optimization job created, waiting to start"
+        message="Optimization job created, dispatching to worker..."
     )
     
-    # TODO: Trigger Celery task here
-    # celery_tasks.run_optimization_job.delay(job_id, job_create.dict())
+    # Dispatch Celery task
+    try:
+        from app.workers.tasks import run_optimization_job
+        
+        task = run_optimization_job.apply_async(
+            kwargs={
+                'job_id': job_id,
+                'prompt_id': job_create.prompt_id,
+                'dataset_id': job_create.dataset_id,
+                'config_dict': job_create.config.dict()
+            },
+            task_id=job_id,  # Use job_id as task_id for tracking
+        )
+        
+        # Update job with task info
+        job.celery_task_id = task.id
+        _jobs_store[job_id] = job
+        
+    except Exception as e:
+        # Fallback to in-memory processing if Celery unavailable
+        import logging
+        logging.warning(f"Celery unavailable, job will run synchronously: {e}")
+        event_bus.update_job_progress(
+            job_id=job_id,
+            status=OptimizationStatus.PENDING,
+            message="Warning: Running without Celery (synchronous mode)"
+        )
     
     return job
 
