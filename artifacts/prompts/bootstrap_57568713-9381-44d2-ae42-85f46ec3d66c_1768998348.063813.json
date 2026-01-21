@@ -1,0 +1,49 @@
+{
+  "predictor.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "message": "Book me a flight to New York",
+        "reasoning": "The user is requesting to make a travel arrangement, specifically a flight to New York, which indicates they want to book or reserve a seat on a plane.",
+        "intent": "flight_booking"
+      },
+      {
+        "augmented": true,
+        "message": "I want to cancel my subscription",
+        "reasoning": "The user is expressing a desire to cancel their subscription, which implies they no longer wish to continue a service they are currently paying for. This is a clear indication of an intent to stop or terminate an ongoing payment or service agreement.",
+        "intent": "cancellation"
+      },
+      {
+        "message": "What's the weather like today?",
+        "intent": "weather_query"
+      }
+    ],
+    "signature": {
+      "instructions": "Given the fields `message`, produce the fields `intent`.",
+      "fields": [
+        {
+          "prefix": "Message:",
+          "description": "${message}"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Intent:",
+          "description": "${intent}"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.1.0",
+      "cloudpickle": "3.1"
+    }
+  }
+}

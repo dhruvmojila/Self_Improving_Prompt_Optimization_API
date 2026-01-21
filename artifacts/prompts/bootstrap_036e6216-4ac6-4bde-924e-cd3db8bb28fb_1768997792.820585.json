@@ -1,0 +1,51 @@
+{
+  "predictor.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "text": "I absolutely love this product! Best purchase ever!",
+        "reasoning": "The customer uses very positive language, such as \"absolutely love\" and \"Best purchase ever\", indicating a strong affection for the product.",
+        "sentiment": "positive"
+      },
+      {
+        "augmented": true,
+        "text": "This is terrible quality. Complete waste of money.",
+        "reasoning": "The text expresses a strong negative opinion, using phrases such as \"terrible quality\" and \"complete waste of money\", which indicate dissatisfaction with the product.",
+        "sentiment": "negative"
+      },
+      {
+        "augmented": true,
+        "text": "It's okay I guess. Nothing special about it.",
+        "reasoning": "The text expresses a neutral opinion, using phrases such as \"It's okay\" and \"Nothing special about it\", which indicate a lack of strong emotions or enthusiasm towards the subject.",
+        "sentiment": "neutral"
+      }
+    ],
+    "signature": {
+      "instructions": "Given the fields `text`, produce the fields `sentiment`.",
+      "fields": [
+        {
+          "prefix": "Text:",
+          "description": "${text}"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Sentiment:",
+          "description": "${sentiment}"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.1.0",
+      "cloudpickle": "3.1"
+    }
+  }
+}

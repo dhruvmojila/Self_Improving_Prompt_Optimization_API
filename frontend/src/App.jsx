@@ -239,31 +239,43 @@ function App() {
         const data = await res.json();
         setJob(data);
 
-        console.log(data);
+        console.log("Job status:", data);
 
         if (data.status === "completed" && data.result) {
           setResult(data.result);
 
-          // Create optimized prompt display immediately
-          setOptimizedPrompt({
-            originalTemplate: promptTemplate,
-            optimizedTemplate: `${promptTemplate}
+          // Fetch the REAL optimized prompt from artifact endpoint
+          try {
+            const artifactRes = await fetch(
+              `${API_BASE}/api/v1/optimization/jobs/${job.id}/artifact`
+            );
+            if (artifactRes.ok) {
+              const artifactData = await artifactRes.json();
+              console.log("Artifact data:", artifactData);
 
-            ### 🎓 Few-Shot Examples (Learned by AI):
-            The optimizer selected the best training examples to include in your prompt.
-            These examples teach the model the correct output format and reasoning.
-
-            Example 1: "${inputField}: Amazing product!" → ${outputField}: positive
-            Example 2: "${inputField}: Terrible experience" → ${outputField}: negative  
-            Example 3: "${inputField}: It was okay" → ${outputField}: neutral
-
-            ### ⚡ Optimization Details:
-            • Optimizer: Bootstrap Few-Shot
-            • Teacher Model: Llama-3.3-70B (generated examples)
-            • Student Model: Llama-3.1-8B (production inference)
-            • Improvement: ${data.result.improvement_pct?.toFixed(1) || 0}%`,
-            artifactPath: data.result.artifact_path,
-          });
+              setOptimizedPrompt({
+                originalTemplate: promptTemplate,
+                optimizedTemplate: artifactData.optimized_prompt,
+                demos: artifactData.demos,
+                signature: artifactData.signature,
+                artifactPath: artifactData.artifact_path,
+              });
+            } else {
+              // Fallback to static display
+              setOptimizedPrompt({
+                originalTemplate: promptTemplate,
+                optimizedTemplate: `Could not load artifact. Path: ${data.result.artifact_path}`,
+                artifactPath: data.result.artifact_path,
+              });
+            }
+          } catch (artifactError) {
+            console.error("Error fetching artifact:", artifactError);
+            setOptimizedPrompt({
+              originalTemplate: promptTemplate,
+              optimizedTemplate: `Optimization complete! Artifact saved at: ${data.result.artifact_path}`,
+              artifactPath: data.result.artifact_path,
+            });
+          }
 
           setStep(5);
         }
@@ -273,7 +285,7 @@ function App() {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [job, promptTemplate, inputField, outputField]);
+  }, [job, promptTemplate]);
 
   // Load optimized prompt from artifact
   const loadOptimizedPrompt = async (artifactPath) => {
@@ -681,7 +693,22 @@ The optimized prompt includes high-quality demonstrations selected by the 70B te
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                 <span>📝</span> Your Optimized Prompt
               </h3>
-              <div className="space-y-4">
+
+              {/* Instructions */}
+              {optimizedPrompt.signature && (
+                <div className="mb-4">
+                  <div className="text-xs text-blue-400 mb-1">
+                    🎯 OPTIMIZED INSTRUCTIONS
+                  </div>
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-300 font-medium">
+                    {optimizedPrompt.signature.instructions ||
+                      "Given the input fields, produce the output fields."}
+                  </div>
+                </div>
+              )}
+
+              {/* Original vs Optimized */}
+              <div className="space-y-4 mb-4">
                 <div>
                   <div className="text-xs text-gray-500 mb-1">
                     ORIGINAL TEMPLATE
@@ -690,15 +717,71 @@ The optimized prompt includes high-quality demonstrations selected by the 70B te
                     {optimizedPrompt.originalTemplate}
                   </code>
                 </div>
-                <div>
-                  <div className="text-xs text-green-400 mb-1">
-                    ✨ OPTIMIZED PROMPT (with learned examples)
-                  </div>
-                  <pre className="p-4 bg-gradient-to-br from-green-500/10 to-blue-500/10 border border-green-500/30 rounded-lg text-green-300 font-mono text-sm whitespace-pre-wrap">
-                    {optimizedPrompt.optimizedTemplate}
-                  </pre>
-                </div>
               </div>
+
+              {/* Learned Few-Shot Examples */}
+              {optimizedPrompt.demos && optimizedPrompt.demos.length > 0 && (
+                <div className="mt-6">
+                  <div className="text-xs text-green-400 mb-3">
+                    🎓 LEARNED FEW-SHOT EXAMPLES ({optimizedPrompt.demos.length}{" "}
+                    demos with Chain-of-Thought reasoning)
+                  </div>
+                  <div className="space-y-3">
+                    {optimizedPrompt.demos.map((demo, idx) => (
+                      <div
+                        key={idx}
+                        className="p-4 bg-gradient-to-br from-green-500/10 to-blue-500/10 border border-green-500/30 rounded-lg"
+                      >
+                        <div className="text-xs text-gray-500 mb-2">
+                          Example {idx + 1}
+                        </div>
+                        {Object.entries(demo).map(([key, value]) => {
+                          if (key === "augmented") return null;
+                          const keyDisplay =
+                            key.charAt(0).toUpperCase() + key.slice(1);
+                          const isReasoning = key === "reasoning";
+                          return (
+                            <div key={key} className="mb-2">
+                              <span
+                                className={`text-xs font-medium ${
+                                  isReasoning
+                                    ? "text-purple-400"
+                                    : "text-gray-400"
+                                }`}
+                              >
+                                {keyDisplay}:
+                              </span>
+                              <div
+                                className={`mt-1 text-sm ${
+                                  isReasoning
+                                    ? "text-purple-300 italic"
+                                    : "text-green-300"
+                                }`}
+                              >
+                                {isReasoning ? `"${value}"` : value}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Fallback if no demos */}
+              {(!optimizedPrompt.demos || optimizedPrompt.demos.length === 0) &&
+                optimizedPrompt.optimizedTemplate && (
+                  <div>
+                    <div className="text-xs text-green-400 mb-1">
+                      ✨ OPTIMIZED OUTPUT
+                    </div>
+                    <pre className="p-4 bg-gradient-to-br from-green-500/10 to-blue-500/10 border border-green-500/30 rounded-lg text-green-300 font-mono text-sm whitespace-pre-wrap">
+                      {optimizedPrompt.optimizedTemplate}
+                    </pre>
+                  </div>
+                )}
+
               <div className="mt-4 text-xs text-gray-500">
                 Artifact saved to:{" "}
                 <code className="text-purple-400">{result.artifact_path}</code>

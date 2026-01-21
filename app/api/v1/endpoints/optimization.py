@@ -225,6 +225,116 @@ async def get_optimization_result(
     return job.result
 
 
+@router.get("/jobs/{job_id}/artifact")
+async def get_optimization_artifact(
+    job_id: str,
+    current_user: str = Depends(get_current_user),
+    db: PixeltableClient = Depends(get_db)
+):
+    """
+    Get the optimized prompt artifact with full details.
+    
+    Returns the DSPy-optimized prompt including:
+    - Learned few-shot demonstrations with reasoning
+    - Optimized instructions
+    - Field prefixes
+    """
+    import json
+    from pathlib import Path
+    
+    job = await get_optimization_job(job_id, current_user, db)
+    
+    if job.status != OptimizationStatus.COMPLETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Job is {job.status}, not completed"
+        )
+    
+    if not job.result or not job.result.artifact_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Artifact not available"
+        )
+    
+    artifact_path = Path(job.result.artifact_path)
+    if not artifact_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact file not found: {artifact_path}"
+        )
+    
+    try:
+        with open(artifact_path, 'r') as f:
+            artifact_data = json.load(f)
+        
+        # Extract the optimized prompt components
+        predictor_data = artifact_data.get("predictor.predict", artifact_data.get("predictor", {}))
+        demos = predictor_data.get("demos", [])
+        signature = predictor_data.get("signature", {})
+        
+        # Build readable optimized prompt
+        optimized_prompt = build_optimized_prompt(signature, demos)
+        
+        return {
+            "job_id": job_id,
+            "artifact_path": str(artifact_path),
+            "raw_artifact": artifact_data,
+            "optimized_prompt": optimized_prompt,
+            "demos": demos,
+            "signature": signature,
+            "num_demos": len(demos),
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error reading artifact: {str(e)}"
+        )
+
+
+def build_optimized_prompt(signature: dict, demos: list) -> str:
+    """Build a human-readable optimized prompt from DSPy artifact."""
+    
+    instructions = signature.get("instructions", "")
+    fields = signature.get("fields", [])
+    
+    # Build the prompt
+    lines = []
+    lines.append("=" * 60)
+    lines.append("🎯 OPTIMIZED PROMPT")
+    lines.append("=" * 60)
+    lines.append("")
+    lines.append(f"📋 Instructions: {instructions}")
+    lines.append("")
+    
+    # Add field definitions
+    if fields:
+        lines.append("📝 Fields:")
+        for field in fields:
+            prefix = field.get("prefix", "")
+            desc = field.get("description", "")
+            lines.append(f"   {prefix} {desc}")
+        lines.append("")
+    
+    # Add learned demonstrations
+    if demos:
+        lines.append("=" * 60)
+        lines.append(f"🎓 LEARNED FEW-SHOT EXAMPLES ({len(demos)} demos)")
+        lines.append("=" * 60)
+        lines.append("")
+        
+        for i, demo in enumerate(demos, 1):
+            lines.append(f"--- Example {i} ---")
+            for key, value in demo.items():
+                if key != "augmented":
+                    # Format nicely
+                    key_display = key.replace("_", " ").title()
+                    lines.append(f"{key_display}: {value}")
+            lines.append("")
+    
+    return "\n".join(lines)
+
+
 @router.post("/jobs/{job_id}/promote", response_model=PromotionResponse)
 async def promote_prompt(
     job_id: str,
