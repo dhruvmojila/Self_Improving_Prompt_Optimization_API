@@ -1,0 +1,49 @@
+{
+  "predictor.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "message": "What's the weather like today?",
+        "reasoning": "The user is asking for information about the current weather, indicating a desire to know the conditions outside, which suggests they need information on temperature, precipitation, or other meteorological factors.",
+        "intent": "information_request/weather_query"
+      },
+      {
+        "augmented": true,
+        "message": "Book me a flight to New York",
+        "reasoning": "The user is requesting a specific action, which is to book a flight to a particular destination, indicating a clear intention to make a travel arrangement. The language used is direct and imperative, suggesting that the user expects the system to facilitate this action.",
+        "intent": "flight_booking"
+      },
+      {
+        "message": "I want to cancel my subscription",
+        "intent": "cancellation"
+      }
+    ],
+    "signature": {
+      "instructions": "Detect user intent for chatbot",
+      "fields": [
+        {
+          "prefix": "Message:",
+          "description": "${message}"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Intent:",
+          "description": "${intent}"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.1.0",
+      "cloudpickle": "3.1"
+    }
+  }
+}

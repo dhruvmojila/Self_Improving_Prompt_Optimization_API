@@ -1,0 +1,51 @@
+{
+  "predictor.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "text": "I absolutely love this product! Best purchase ever!",
+        "reasoning": "The customer uses very positive language, such as \"I absolutely love\" and \"Best purchase ever\", which indicates a strong affection for the product.",
+        "sentiment": "positive"
+      },
+      {
+        "augmented": true,
+        "text": "This is terrible quality. Complete waste of money.",
+        "reasoning": "The text expresses a strong negative opinion, using phrases such as \"terrible quality\" and \"complete waste of money\", indicating a high level of dissatisfaction with the product.",
+        "sentiment": "negative"
+      },
+      {
+        "augmented": true,
+        "text": "It's okay I guess. Nothing special about it.",
+        "reasoning": "The text expresses a neutral opinion, using phrases such as \"It's okay\" and \"Nothing special about it\", which indicate a lack of strong emotions or enthusiasm towards the subject.",
+        "sentiment": "neutral"
+      }
+    ],
+    "signature": {
+      "instructions": "Classify text as positive, negative, or neutral",
+      "fields": [
+        {
+          "prefix": "Text:",
+          "description": "${text}"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Sentiment:",
+          "description": "${sentiment}"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.1.0",
+      "cloudpickle": "3.1"
+    }
+  }
+}

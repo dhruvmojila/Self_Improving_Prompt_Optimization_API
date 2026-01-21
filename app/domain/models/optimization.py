@@ -130,6 +130,9 @@ class OptimizationResult(BaseModel):
     # Changelog
     changelog: Optional[str] = Field(None, description="Natural language explanation of changes")
     
+    # Artifact path
+    artifact_path: Optional[str] = Field(None, description="Path to optimized prompt artifact")
+
     # Optimization metadata
     trials_run: int
     best_trial_index: int
