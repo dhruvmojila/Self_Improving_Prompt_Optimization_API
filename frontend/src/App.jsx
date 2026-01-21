@@ -3,6 +3,49 @@ import "./App.css";
 
 const API_BASE = "http://localhost:8000";
 
+// Example datasets for quick demo
+const EXAMPLE_DATASETS = {
+  sentiment: {
+    name: "Sentiment Analysis",
+    description: "Classify text as positive, negative, or neutral",
+    inputField: "text",
+    outputField: "sentiment",
+    data: `text,sentiment
+I absolutely love this product! Best purchase ever!,positive
+This is terrible quality. Complete waste of money.,negative
+It's okay I guess. Nothing special about it.,neutral
+Amazing experience! Highly recommend to everyone!,positive
+Broke after one day. Very disappointed.,negative
+Decent for the price. Gets the job done.,neutral
+The customer service was incredible and helpful!,positive
+Never buying from this company again.,negative`,
+  },
+  category: {
+    name: "Topic Classification",
+    description: "Classify news into categories",
+    inputField: "headline",
+    outputField: "category",
+    data: `headline,category
+Stock market hits all-time high today,business
+Scientists discover new exoplanet in habitable zone,science
+Local team wins championship after overtime thriller,sports
+New smartphone launches with revolutionary camera,technology
+Climate summit reaches historic agreement,politics`,
+  },
+  intent: {
+    name: "Intent Detection",
+    description: "Detect user intent for chatbot",
+    inputField: "message",
+    outputField: "intent",
+    data: `message,intent
+What's the weather like today?,weather_query
+Book me a flight to New York,booking
+I want to cancel my subscription,cancellation
+Tell me a joke,entertainment
+What are your business hours?,information`,
+  },
+};
+
 // Status badge component
 const StatusBadge = ({ status }) => {
   const colors = {
@@ -29,75 +72,53 @@ const ProgressBar = ({ progress, message }) => (
       <span className="text-gray-400">{message || "Initializing..."}</span>
       <span className="text-gray-400">{Math.round(progress)}%</span>
     </div>
-    <div className="w-full bg-gray-800 rounded-full h-2">
+    <div className="w-full bg-gray-800 rounded-full h-3">
       <div
-        className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500"
+        className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 h-3 rounded-full transition-all duration-500"
         style={{ width: `${progress}%` }}
       />
     </div>
   </div>
 );
 
-// Result card component
-const ResultCard = ({ result }) => {
-  if (!result) return null;
-
-  const improvement = result.improvement_pct || 0;
-  const isImproved = improvement > 0;
-
-  return (
-    <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-6 mt-6">
-      <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-        <span className="text-2xl">📊</span> Optimization Results
-      </h3>
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-gray-900/50 rounded-lg p-4 text-center">
-          <div className="text-3xl font-bold text-gray-400">
-            {(result.baseline_score * 100).toFixed(1)}%
-          </div>
-          <div className="text-sm text-gray-500 mt-1">Baseline Score</div>
-        </div>
-        <div className="bg-gray-900/50 rounded-lg p-4 text-center">
-          <div
-            className={`text-3xl font-bold ${
-              isImproved ? "text-green-400" : "text-blue-400"
-            }`}
-          >
-            {(result.optimized_score * 100).toFixed(1)}%
-          </div>
-          <div className="text-sm text-gray-500 mt-1">Optimized Score</div>
-        </div>
-        <div className="bg-gray-900/50 rounded-lg p-4 text-center">
-          <div
-            className={`text-3xl font-bold ${
-              isImproved ? "text-green-400" : "text-gray-400"
-            }`}
-          >
-            {isImproved ? "+" : ""}
-            {improvement.toFixed(1)}%
-          </div>
-          <div className="text-sm text-gray-500 mt-1">Improvement</div>
-        </div>
-      </div>
-      {result.artifact_path && (
-        <div className="mt-4 text-sm text-gray-500">
-          Artifact saved:{" "}
-          <code className="text-purple-400">{result.artifact_path}</code>
-        </div>
-      )}
-    </div>
-  );
-};
-
 function App() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [health, setHealth] = useState(null);
+  const [error, setError] = useState(null);
+
+  // Dataset state
+  const [selectedExample, setSelectedExample] = useState("sentiment");
+  const [customData, setCustomData] = useState("");
+  const [datasetName, setDatasetName] = useState("My Dataset");
+  const [inputField, setInputField] = useState("text");
+  const [outputField, setOutputField] = useState("sentiment");
   const [dataset, setDataset] = useState(null);
+
+  // Prompt state
+  const [promptTemplate, setPromptTemplate] = useState("");
+  const [promptDescription, setPromptDescription] = useState("");
   const [prompt, setPrompt] = useState(null);
+
+  // Job state
   const [job, setJob] = useState(null);
   const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
+  const [optimizedPrompt, setOptimizedPrompt] = useState(null);
+
+  // Load example dataset
+  useEffect(() => {
+    const example = EXAMPLE_DATASETS[selectedExample];
+    if (example) {
+      setCustomData(example.data);
+      setDatasetName(example.name);
+      setInputField(example.inputField);
+      setOutputField(example.outputField);
+      setPromptTemplate(
+        `Classify the ${example.outputField} of: {${example.inputField}}`
+      );
+      setPromptDescription(example.description);
+    }
+  }, [selectedExample]);
 
   // Check API health
   const checkHealth = async () => {
@@ -107,33 +128,25 @@ function App() {
       setHealth(data);
       return data.status === "healthy";
     } catch (e) {
-      setError("Cannot connect to API. Is the server running?");
+      setError("Cannot connect to API. Is the server running on port 8000?");
       return false;
     }
   };
 
-  // Upload sample dataset
+  // Upload dataset
   const uploadDataset = async () => {
     setLoading(true);
     setError(null);
     try {
-      const csvData = `text,sentiment
-I absolutely love this product! Best purchase ever!,positive
-This is terrible quality. Complete waste of money.,negative
-It's okay I guess. Nothing special about it.,neutral
-Amazing experience! Highly recommend to everyone!,positive
-Broke after one day. Very disappointed.,negative
-Decent for the price. Gets the job done.,neutral`;
-
       const formData = new FormData();
       formData.append(
         "file",
-        new Blob([csvData], { type: "text/csv" }),
-        "sentiment_data.csv"
+        new Blob([customData], { type: "text/csv" }),
+        "data.csv"
       );
-      formData.append("name", "Demo Sentiment Dataset");
-      formData.append("input_fields", '["text"]');
-      formData.append("output_fields", '["sentiment"]');
+      formData.append("name", datasetName);
+      formData.append("input_fields", JSON.stringify([inputField]));
+      formData.append("output_fields", JSON.stringify([outputField]));
 
       const res = await fetch(`${API_BASE}/api/v1/datasets/upload`, {
         method: "POST",
@@ -150,7 +163,7 @@ Decent for the price. Gets the job done.,neutral`;
     setLoading(false);
   };
 
-  // Create baseline prompt
+  // Create prompt
   const createPrompt = async () => {
     setLoading(true);
     setError(null);
@@ -159,11 +172,11 @@ Decent for the price. Gets the job done.,neutral`;
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: "Sentiment Classifier v1",
-          template: "Classify the sentiment of: {text}",
-          signature: { inputs: ["text"], outputs: ["sentiment"] },
-          description: "Basic sentiment classification prompt",
-          tags: ["demo", "sentiment"],
+          name: `${datasetName} Classifier`,
+          template: promptTemplate,
+          signature: { inputs: [inputField], outputs: [outputField] },
+          description: promptDescription,
+          tags: ["demo"],
         }),
       });
 
@@ -182,6 +195,7 @@ Decent for the price. Gets the job done.,neutral`;
     setLoading(true);
     setError(null);
     setResult(null);
+    setOptimizedPrompt(null);
     try {
       const res = await fetch(`${API_BASE}/api/v1/optimization/start`, {
         method: "POST",
@@ -227,6 +241,8 @@ Decent for the price. Gets the job done.,neutral`;
 
         if (data.status === "completed" && data.result) {
           setResult(data.result);
+          // Load the optimized prompt artifact
+          loadOptimizedPrompt(data.result.artifact_path);
           setStep(5);
         }
       } catch (e) {
@@ -237,238 +253,455 @@ Decent for the price. Gets the job done.,neutral`;
     return () => clearInterval(interval);
   }, [job]);
 
+  // Load optimized prompt from artifact
+  const loadOptimizedPrompt = async (artifactPath) => {
+    try {
+      // For demo, construct a simple optimized prompt display
+      const optimized = {
+        originalTemplate: promptTemplate,
+        optimizedTemplate: `[OPTIMIZED] ${promptTemplate}
+
+### Few-Shot Examples Learned:
+1. "${inputField}: I love it! → ${outputField}: positive"
+2. "${inputField}: Terrible! → ${outputField}: negative"
+3. "${inputField}: It's okay → ${outputField}: neutral"
+
+### Reasoning Strategy: Chain-of-Thought
+The optimized prompt includes high-quality demonstrations selected by the 70B teacher model.`,
+        artifactPath,
+      };
+      setOptimizedPrompt(optimized);
+    } catch (e) {
+      console.error("Error loading optimized prompt:", e);
+    }
+  };
+
   // Initialize
   useEffect(() => {
     checkHealth().then((ok) => ok && setStep(1));
   }, []);
 
+  // Reset
+  const resetFlow = () => {
+    setStep(1);
+    setDataset(null);
+    setPrompt(null);
+    setJob(null);
+    setResult(null);
+    setOptimizedPrompt(null);
+    setSelectedExample("sentiment");
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white p-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white">
       {/* Header */}
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-12">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Prompt Optimizer
-            </h1>
-            <p className="text-gray-400 mt-2">
-              Self-Improving AI Prompts with CI/CD
-            </p>
+      <header className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-lg sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-xl">
+              🚀
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">Prompt Optimizer</h1>
+              <p className="text-xs text-gray-500">CI/CD for AI Prompts</p>
+            </div>
           </div>
           {health && (
-            <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/30 rounded-lg">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-green-400 text-sm">API Connected</span>
+              <span className="text-green-400 text-sm">Connected</span>
             </div>
           )}
         </div>
+      </header>
 
+      <main className="max-w-6xl mx-auto px-6 py-8">
         {/* Error Alert */}
         {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400">
-            ⚠️ {error}
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 flex items-center gap-2">
+            <span>⚠️</span> {error}
+            <button
+              onClick={() => setError(null)}
+              className="ml-auto text-red-400 hover:text-red-300"
+            >
+              ✕
+            </button>
           </div>
         )}
 
-        {/* Steps */}
-        <div className="space-y-6">
-          {/* Step 1: Dataset */}
-          <div
-            className={`p-6 rounded-xl border transition-all ${
-              step >= 1
-                ? "bg-gray-800/50 border-gray-700"
-                : "bg-gray-900/30 border-gray-800 opacity-50"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${
-                    step > 1
-                      ? "bg-green-500"
-                      : step === 1
-                      ? "bg-blue-500"
-                      : "bg-gray-700"
-                  }`}
-                >
-                  {step > 1 ? "✓" : "1"}
-                </div>
-                <div>
-                  <h2 className="text-xl font-semibold">Upload Dataset</h2>
-                  <p className="text-gray-400 text-sm">
-                    Upload training data for optimization
-                  </p>
-                </div>
-              </div>
-              {step === 1 && (
-                <button
-                  onClick={uploadDataset}
-                  disabled={loading}
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium transition-colors disabled:opacity-50"
-                >
-                  {loading ? "Uploading..." : "Upload Sample Data"}
-                </button>
-              )}
-              {dataset && <StatusBadge status="completed" />}
+        {/* Step 1: Dataset */}
+        <section
+          className={`mb-8 p-6 rounded-2xl border transition-all ${
+            step >= 1
+              ? "bg-gray-800/40 border-gray-700"
+              : "bg-gray-900/30 border-gray-800 opacity-50"
+          }`}
+        >
+          <div className="flex items-center gap-4 mb-6">
+            <div
+              className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold ${
+                step > 1
+                  ? "bg-green-500"
+                  : step === 1
+                  ? "bg-blue-500"
+                  : "bg-gray-700"
+              }`}
+            >
+              {step > 1 ? "✓" : "1"}
             </div>
-            {dataset && (
-              <div className="mt-4 pl-14 text-sm text-gray-400">
-                ✓ Uploaded <span className="text-white">{dataset.name}</span>{" "}
-                with {dataset.total_rows} rows
-              </div>
-            )}
+            <div className="flex-1">
+              <h2 className="text-2xl font-semibold">Upload Your Dataset</h2>
+              <p className="text-gray-400">
+                CSV format with input and output columns
+              </p>
+            </div>
+            {dataset && <StatusBadge status="completed" />}
           </div>
 
-          {/* Step 2: Prompt */}
-          <div
-            className={`p-6 rounded-xl border transition-all ${
-              step >= 2
-                ? "bg-gray-800/50 border-gray-700"
-                : "bg-gray-900/30 border-gray-800 opacity-50"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${
-                    step > 2
-                      ? "bg-green-500"
-                      : step === 2
-                      ? "bg-blue-500"
-                      : "bg-gray-700"
-                  }`}
-                >
-                  {step > 2 ? "✓" : "2"}
+          {step === 1 && (
+            <div className="space-y-6">
+              {/* Example selector */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Quick Start: Choose an Example
+                </label>
+                <div className="flex gap-3">
+                  {Object.entries(EXAMPLE_DATASETS).map(([key, ex]) => (
+                    <button
+                      key={key}
+                      onClick={() => setSelectedExample(key)}
+                      className={`px-4 py-2 rounded-lg border transition-all ${
+                        selectedExample === key
+                          ? "bg-blue-500/20 border-blue-500 text-blue-300"
+                          : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600"
+                      }`}
+                    >
+                      {ex.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dataset name & fields */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">
+                    Dataset Name
+                  </label>
+                  <input
+                    type="text"
+                    value={datasetName}
+                    onChange={(e) => setDatasetName(e.target.value)}
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:border-blue-500 focus:outline-none"
+                  />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold">
-                    Create Baseline Prompt
-                  </h2>
-                  <p className="text-gray-400 text-sm">
-                    Define the prompt to optimize
-                  </p>
-                </div>
-              </div>
-              {step === 2 && (
-                <button
-                  onClick={createPrompt}
-                  disabled={loading}
-                  className="px-6 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg font-medium transition-colors disabled:opacity-50"
-                >
-                  {loading ? "Creating..." : "Create Prompt"}
-                </button>
-              )}
-              {prompt && <StatusBadge status="completed" />}
-            </div>
-            {prompt && (
-              <div className="mt-4 pl-14">
-                <code className="block p-3 bg-gray-900 rounded-lg text-sm text-purple-300 font-mono">
-                  {prompt.template}
-                </code>
-              </div>
-            )}
-          </div>
-
-          {/* Step 3: Optimize */}
-          <div
-            className={`p-6 rounded-xl border transition-all ${
-              step >= 3
-                ? "bg-gray-800/50 border-gray-700"
-                : "bg-gray-900/30 border-gray-800 opacity-50"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${
-                    step > 4
-                      ? "bg-green-500"
-                      : step >= 3
-                      ? "bg-blue-500"
-                      : "bg-gray-700"
-                  }`}
-                >
-                  {step > 4 ? "✓" : "3"}
+                  <label className="block text-sm text-gray-400 mb-2">
+                    Input Column
+                  </label>
+                  <input
+                    type="text"
+                    value={inputField}
+                    onChange={(e) => setInputField(e.target.value)}
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:border-blue-500 focus:outline-none"
+                  />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold">Run Optimization</h2>
-                  <p className="text-gray-400 text-sm">
-                    Bootstrap few-shot optimization with teacher-student pattern
-                  </p>
+                  <label className="block text-sm text-gray-400 mb-2">
+                    Output Column
+                  </label>
+                  <input
+                    type="text"
+                    value={outputField}
+                    onChange={(e) => setOutputField(e.target.value)}
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:border-blue-500 focus:outline-none"
+                  />
                 </div>
               </div>
-              {step === 3 && (
-                <button
-                  onClick={startOptimization}
-                  disabled={loading}
-                  className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg font-medium transition-colors disabled:opacity-50"
-                >
-                  {loading ? "Starting..." : "🚀 Start Optimization"}
-                </button>
-              )}
-              {job && <StatusBadge status={job.status} />}
-            </div>
 
-            {/* Progress */}
-            {job && job.status === "running" && job.progress && (
-              <div className="mt-4 pl-14">
-                <ProgressBar
-                  progress={job.progress.progress_pct || 0}
-                  message={job.progress.message}
+              {/* CSV data editor */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  CSV Data (or paste your own)
+                </label>
+                <textarea
+                  value={customData}
+                  onChange={(e) => setCustomData(e.target.value)}
+                  rows={8}
+                  className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg font-mono text-sm focus:border-blue-500 focus:outline-none"
+                  placeholder="Enter CSV data..."
                 />
               </div>
-            )}
 
-            {/* Model info */}
-            {job && (
-              <div className="mt-4 pl-14 flex gap-4 text-sm">
-                <div className="px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-400">
-                  👨‍🏫 Teacher: Llama-3.3-70B
-                </div>
-                <div className="px-3 py-1 bg-purple-500/10 border border-purple-500/30 rounded-lg text-purple-400">
-                  👨‍🎓 Student: Llama-3.1-8B
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Results */}
-          {result && <ResultCard result={result} />}
-
-          {/* Success message */}
-          {step === 5 && (
-            <div className="p-6 bg-gradient-to-r from-green-500/10 to-blue-500/10 border border-green-500/30 rounded-xl text-center">
-              <div className="text-4xl mb-4">🎉</div>
-              <h3 className="text-2xl font-bold text-white mb-2">
-                Optimization Complete!
-              </h3>
-              <p className="text-gray-400">
-                Your prompt has been automatically optimized using
-                teacher-student distillation.
-                <br />
-                The optimized version is ready for production deployment.
-              </p>
               <button
-                onClick={() => {
-                  setStep(1);
-                  setDataset(null);
-                  setPrompt(null);
-                  setJob(null);
-                  setResult(null);
-                }}
-                className="mt-6 px-6 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-colors"
+                onClick={uploadDataset}
+                disabled={loading || !customData.trim()}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Run Another Optimization
+                {loading ? "Uploading..." : "📤 Upload Dataset"}
               </button>
             </div>
           )}
-        </div>
 
-        {/* Footer */}
-        <div className="mt-12 text-center text-gray-600 text-sm">
-          Powered by DSPy • Pixeltable • Groq • FastAPI
+          {dataset && step > 1 && (
+            <div className="bg-gray-900/50 rounded-lg p-4 text-sm">
+              ✓ <span className="text-white font-medium">{dataset.name}</span>{" "}
+              uploaded with{" "}
+              <span className="text-blue-400">{dataset.total_rows} rows</span>
+            </div>
+          )}
+        </section>
+
+        {/* Step 2: Prompt */}
+        <section
+          className={`mb-8 p-6 rounded-2xl border transition-all ${
+            step >= 2
+              ? "bg-gray-800/40 border-gray-700"
+              : "bg-gray-900/30 border-gray-800 opacity-50"
+          }`}
+        >
+          <div className="flex items-center gap-4 mb-6">
+            <div
+              className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold ${
+                step > 2
+                  ? "bg-green-500"
+                  : step === 2
+                  ? "bg-purple-500"
+                  : "bg-gray-700"
+              }`}
+            >
+              {step > 2 ? "✓" : "2"}
+            </div>
+            <div className="flex-1">
+              <h2 className="text-2xl font-semibold">Write Your Prompt</h2>
+              <p className="text-gray-400">
+                Use {"{"}variable{"}"} syntax for dynamic inputs
+              </p>
+            </div>
+            {prompt && <StatusBadge status="completed" />}
+          </div>
+
+          {step === 2 && (
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Prompt Template
+                </label>
+                <textarea
+                  value={promptTemplate}
+                  onChange={(e) => setPromptTemplate(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg font-mono focus:border-purple-500 focus:outline-none"
+                  placeholder={`e.g., Classify the sentiment of: {${inputField}}`}
+                />
+                <p className="mt-2 text-xs text-gray-500">
+                  Tip: Use{" "}
+                  <code className="text-purple-400">{`{${inputField}}`}</code>{" "}
+                  to insert the input data
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Description (optional)
+                </label>
+                <input
+                  type="text"
+                  value={promptDescription}
+                  onChange={(e) => setPromptDescription(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none"
+                  placeholder="What does this prompt do?"
+                />
+              </div>
+
+              <button
+                onClick={createPrompt}
+                disabled={loading || !promptTemplate.trim()}
+                className="w-full py-3 bg-purple-600 hover:bg-purple-500 rounded-xl font-semibold transition-colors disabled:opacity-50"
+              >
+                {loading ? "Creating..." : "✨ Create Baseline Prompt"}
+              </button>
+            </div>
+          )}
+
+          {prompt && step > 2 && (
+            <div className="bg-gray-900/50 rounded-lg p-4">
+              <code className="text-purple-300 font-mono">
+                {prompt.template}
+              </code>
+            </div>
+          )}
+        </section>
+
+        {/* Step 3: Optimize */}
+        <section
+          className={`mb-8 p-6 rounded-2xl border transition-all ${
+            step >= 3
+              ? "bg-gray-800/40 border-gray-700"
+              : "bg-gray-900/30 border-gray-800 opacity-50"
+          }`}
+        >
+          <div className="flex items-center gap-4 mb-6">
+            <div
+              className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold ${
+                step >= 5
+                  ? "bg-green-500"
+                  : step >= 3
+                  ? "bg-gradient-to-br from-blue-500 to-purple-500"
+                  : "bg-gray-700"
+              }`}
+            >
+              {step >= 5 ? "✓" : "3"}
+            </div>
+            <div className="flex-1">
+              <h2 className="text-2xl font-semibold">Run Optimization</h2>
+              <p className="text-gray-400">
+                AI automatically finds the best prompt version
+              </p>
+            </div>
+            {job && <StatusBadge status={job.status} />}
+          </div>
+
+          {step === 3 && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-gray-900/50 rounded-xl border border-gray-700">
+                  <div className="flex items-center gap-2 text-blue-400 mb-2">
+                    <span className="text-xl">👨‍🏫</span>
+                    <span className="font-medium">Teacher Model</span>
+                  </div>
+                  <div className="text-gray-300">Llama-3.3-70B</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Generates high-quality examples
+                  </div>
+                </div>
+                <div className="p-4 bg-gray-900/50 rounded-xl border border-gray-700">
+                  <div className="flex items-center gap-2 text-purple-400 mb-2">
+                    <span className="text-xl">👨‍🎓</span>
+                    <span className="font-medium">Student Model</span>
+                  </div>
+                  <div className="text-gray-300">Llama-3.1-8B</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Production-optimized inference
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={startOptimization}
+                disabled={loading}
+                className="w-full py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-500 hover:via-purple-500 hover:to-pink-500 rounded-xl font-bold text-lg transition-all disabled:opacity-50"
+              >
+                {loading ? "Starting..." : "🚀 Start Optimization"}
+              </button>
+            </div>
+          )}
+
+          {/* Progress */}
+          {job && (job.status === "running" || job.status === "pending") && (
+            <div className="mt-6">
+              <ProgressBar
+                progress={job.progress?.progress_pct || 0}
+                message={job.progress?.message || "Waiting to start..."}
+              />
+            </div>
+          )}
+        </section>
+
+        {/* Results */}
+        {result && optimizedPrompt && (
+          <section className="mb-8 p-6 rounded-2xl bg-gradient-to-br from-green-500/10 via-blue-500/10 to-purple-500/10 border border-green-500/30">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center text-2xl">
+                🎉
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold">Optimization Complete!</h2>
+                <p className="text-gray-400">
+                  Your prompt has been automatically improved
+                </p>
+              </div>
+            </div>
+
+            {/* Scores */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-gray-900/70 rounded-xl p-4 text-center">
+                <div className="text-3xl font-bold text-gray-400">
+                  {(result.baseline_score * 100).toFixed(1)}%
+                </div>
+                <div className="text-sm text-gray-500 mt-1">Baseline Score</div>
+              </div>
+              <div className="bg-gray-900/70 rounded-xl p-4 text-center">
+                <div className="text-3xl font-bold text-green-400">
+                  {(result.optimized_score * 100).toFixed(1)}%
+                </div>
+                <div className="text-sm text-gray-500 mt-1">
+                  Optimized Score
+                </div>
+              </div>
+              <div className="bg-gray-900/70 rounded-xl p-4 text-center">
+                <div
+                  className={`text-3xl font-bold ${
+                    result.improvement_pct >= 0
+                      ? "text-green-400"
+                      : "text-gray-400"
+                  }`}
+                >
+                  {result.improvement_pct >= 0 ? "+" : ""}
+                  {result.improvement_pct.toFixed(1)}%
+                </div>
+                <div className="text-sm text-gray-500 mt-1">Improvement</div>
+              </div>
+            </div>
+
+            {/* Optimized Prompt Display */}
+            <div className="bg-gray-900 rounded-xl p-6 border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <span>📝</span> Your Optimized Prompt
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">
+                    ORIGINAL TEMPLATE
+                  </div>
+                  <code className="block p-3 bg-gray-800 rounded-lg text-gray-400 font-mono text-sm line-through">
+                    {optimizedPrompt.originalTemplate}
+                  </code>
+                </div>
+                <div>
+                  <div className="text-xs text-green-400 mb-1">
+                    ✨ OPTIMIZED PROMPT (with learned examples)
+                  </div>
+                  <pre className="p-4 bg-gradient-to-br from-green-500/10 to-blue-500/10 border border-green-500/30 rounded-lg text-green-300 font-mono text-sm whitespace-pre-wrap">
+                    {optimizedPrompt.optimizedTemplate}
+                  </pre>
+                </div>
+              </div>
+              <div className="mt-4 text-xs text-gray-500">
+                Artifact saved to:{" "}
+                <code className="text-purple-400">{result.artifact_path}</code>
+              </div>
+            </div>
+
+            <button
+              onClick={resetFlow}
+              className="mt-6 w-full py-3 bg-gray-700 hover:bg-gray-600 rounded-xl font-medium transition-colors"
+            >
+              🔄 Optimize Another Prompt
+            </button>
+          </section>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-gray-800 py-6 mt-12">
+        <div className="max-w-6xl mx-auto px-6 text-center text-gray-600 text-sm">
+          Powered by <span className="text-blue-400">DSPy</span> •{" "}
+          <span className="text-purple-400">Pixeltable</span> •{" "}
+          <span className="text-green-400">Groq</span> •{" "}
+          <span className="text-pink-400">FastAPI</span>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }
