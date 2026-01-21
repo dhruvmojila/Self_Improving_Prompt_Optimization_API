@@ -45,7 +45,14 @@ class ProductionDSPyOptimizer:
         self._setup_dspy_models()
     
     def _setup_dspy_models(self):
-        """Configure DSPy with teacher and student models using dspy.LM()."""
+        """
+        Configure DSPy with teacher and student models using dspy.LM().
+        
+        IMPORTANT: Due to DSPy thread-safety restrictions, we DON'T call
+        dspy.configure() here. Instead, we store the LMs and use 
+        dspy.context(lm=...) for all operations. This allows the optimizer
+        to work correctly in Celery workers.
+        """
         try:
             # Student model (for production inference)
             if self.config.student_provider.lower() == "groq":
@@ -79,8 +86,16 @@ class ProductionDSPyOptimizer:
             else:
                 raise ValueError(f"Unsupported provider: {self.config.teacher_provider}")
             
-            # Configure DSPy with student as default
-            dspy.configure(lm=self.student_lm)
+            # Try to configure globally, but catch thread-safety error
+            try:
+                dspy.configure(lm=self.student_lm)
+            except RuntimeError as e:
+                if "thread that initially configured" in str(e):
+                    # Already configured in another thread - that's OK
+                    # We'll use dspy.context() for all operations
+                    logger.debug("DSPy already configured in another thread, using context() instead")
+                else:
+                    raise
             
             logger.info(
                 f"DSPy configured - Student: {self.config.student_provider}/{self.config.student_model}, "
@@ -133,6 +148,11 @@ class ProductionDSPyOptimizer:
             List of DSPy Example objects
         """
         try:
+            # IMPORTANT: Initialize Pixeltable fresh for process isolation
+            # This handles Celery workers running in separate processes
+            from app.infrastructure.pixeltable import init_pixeltable, get_schemas
+            init_pixeltable()  # Re-initialize to get fresh connection
+            
             schemas = get_schemas()
             table = schemas.get_table('datasets')
             
@@ -298,23 +318,29 @@ class ProductionDSPyOptimizer:
         """
         scores = []
         
-        for example in dataset:
-            try:
-                # Get prediction
-                prediction = module(**example.inputs())
-                
-                # Calculate metric
-                score = metric_fn(example, prediction)
-                scores.append(score)
-                
-            except Exception as e:
-                logger.warning(f"Evaluation failed for example: {e}")
-                scores.append(0.0)
+        # Use student LM for evaluation (wrapped in context for thread safety)
+        with dspy.context(lm=self.student_lm):
+            for example in dataset:
+                try:
+                    # Get prediction
+                    prediction = module(**example.inputs())
+                    
+                    # Calculate metric
+                    score = metric_fn(example, prediction)
+                    scores.append(score)
+                    
+                except Exception as e:
+                    logger.warning(f"Evaluation failed for example: {e}")
+                    scores.append(0.0)
         
         return sum(scores) / len(scores) if scores else 0.0
     
     def _get_prompt_from_db(self, prompt_id: str) -> Dict[str, Any]:
-        """Fetch prompt from Pixeltable."""
+        """Fetch prompt from Pixeltable with fresh connection."""
+        # Use fresh connection for process isolation (Celery workers)
+        from app.infrastructure.pixeltable import init_pixeltable, get_schemas
+        init_pixeltable()
+        
         schemas = get_schemas()
         prompts_table = schemas.get_table('prompts')
         results = prompts_table.where(prompts_table.prompt_id == prompt_id).collect()

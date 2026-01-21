@@ -110,28 +110,81 @@ async def get_optimization_job(
     Get optimization job status.
     
     Poll this endpoint to track progress of the optimization.
+    Queries Celery/Redis for real-time task status.
     """
-    if job_id not in _jobs_store:
-        # Try event bus
-        job_progress = event_bus.get_job_progress(job_id)
-        if not job_progress:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job {job_id} not found"
+    # First check in-memory store for job metadata
+    job = _jobs_store.get(job_id)
+    
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job {job_id} not found"
+        )
+    
+    # Query Celery for actual task status from Redis
+    try:
+        from celery.result import AsyncResult
+        from app.workers.celery_app import celery_app
+        
+        task_result = AsyncResult(job_id, app=celery_app)
+        
+        if task_result.state == 'PENDING':
+            job.status = OptimizationStatus.PENDING
+            job.progress = OptimizationProgress(
+                job_id=job_id,
+                status=OptimizationStatus.PENDING,
+                progress_pct=0.0,
+                message="Waiting to start..."
+            )
+        elif task_result.state == 'STARTED' or task_result.state == 'PROGRESS':
+            job.status = OptimizationStatus.RUNNING
+            meta = task_result.info or {}
+            job.progress = OptimizationProgress(
+                job_id=job_id,
+                status=OptimizationStatus.RUNNING,
+                progress_pct=meta.get('progress', 0.0),
+                message=meta.get('message', 'Running...')
+            )
+        elif task_result.state == 'SUCCESS':
+            job.status = OptimizationStatus.COMPLETED
+            result_data = task_result.result or {}
+            job.progress = OptimizationProgress(
+                job_id=job_id,
+                status=OptimizationStatus.COMPLETED,
+                progress_pct=100.0,
+                message="Optimization completed!"
+            )
+            # Store result
+            job.result = OptimizationResult(
+                job_id=job_id,
+                baseline_prompt_id=job.prompt_id,
+                optimized_prompt_id=result_data.get('artifact_path', ''),
+                baseline_score=result_data.get('baseline_score', 0),
+                optimized_score=result_data.get('optimized_score', 0),
+                improvement_pct=result_data.get('improvement_pct', 0),
+                num_trials=result_data.get('num_trials', 0),
+                best_iteration=0,
+                artifact_path=result_data.get('artifact_path', ''),
+                optimizer_type=result_data.get('optimizer_type', 'bootstrap'),
+            )
+        elif task_result.state == 'FAILURE':
+            job.status = OptimizationStatus.FAILED
+            job.progress = OptimizationProgress(
+                job_id=job_id,
+                status=OptimizationStatus.FAILED,
+                progress_pct=0.0,
+                message=f"Failed: {str(task_result.info)}"
             )
         
-        # Create minimal job from progress
-        job = OptimizationJob(
-            id=job_id,
-            prompt_id="",
-            dataset_id="",
-            config=None,
-            status=job_progress.status,
-            progress=OptimizationProgress(**job_progress.dict()),
-        )
-        return job
+        # Update store
+        _jobs_store[job_id] = job
+        
+    except Exception as e:
+        # Fallback to in-memory status if Celery unavailable
+        import logging
+        logging.debug(f"Could not get Celery status: {e}")
     
-    return _jobs_store[job_id]
+    return job
 
 
 @router.get("/jobs/{job_id}/result", response_model=OptimizationResult)
