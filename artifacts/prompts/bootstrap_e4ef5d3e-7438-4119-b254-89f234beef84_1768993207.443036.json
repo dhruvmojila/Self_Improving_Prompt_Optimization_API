@@ -1,0 +1,45 @@
+{
+  "predictor.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "text": "I love this product with all my heart and soul!",
+        "reasoning": "The customer uses very strong and positive language to express their feelings towards the product, such as \"love\" and \"with all my heart and soul\", indicating a highly enthusiastic and affectionate attitude.",
+        "sentiment": "positive"
+      },
+      {
+        "augmented": true,
+        "text": "This is absolutely terrible and I hate it completely.",
+        "reasoning": "The text contains strong negative language, such as \"absolutely terrible\" and \"hate it completely\", which indicates a strong dislike for the subject being discussed.",
+        "sentiment": "negative"
+      }
+    ],
+    "signature": {
+      "instructions": "End-to-end test prompt",
+      "fields": [
+        {
+          "prefix": "Text:",
+          "description": "${text}"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Sentiment:",
+          "description": "${sentiment}"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.1.0",
+      "cloudpickle": "3.1"
+    }
+  }
+}

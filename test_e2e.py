@@ -140,7 +140,6 @@ Decent quality for what you actually pay for.,neutral"""
             break
         
         job_status = response.json()
-        print(job_status)
         status = job_status['status']
         progress = job_status.get('progress', {})
         progress_pct = progress.get('progress_pct', 0)
