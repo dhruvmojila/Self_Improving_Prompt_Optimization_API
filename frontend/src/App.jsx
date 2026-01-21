@@ -102,7 +102,7 @@ function App() {
 
   // Job state
   const [job, setJob] = useState(null);
-  const [progress, setProgress] = useState(null);
+  const [result, setResult] = useState(null);
   const [optimizedPrompt, setOptimizedPrompt] = useState(null);
 
   // Load example dataset
@@ -194,7 +194,7 @@ function App() {
   const startOptimization = async () => {
     setLoading(true);
     setError(null);
-    setProgress(null);
+    setResult(null);
     setOptimizedPrompt(null);
     try {
       const res = await fetch(`${API_BASE}/api/v1/optimization/start`, {
@@ -239,16 +239,16 @@ function App() {
         const data = await res.json();
         setJob(data);
 
-        if (data.status === "completed" && data.progress) {
-          setProgress({
-            ...data.progress,
-            baseline_score: data.baseline_score,
-            optimized_score: data.optimized_score,
-          });
+        console.log(data);
+
+        if (data.status === "completed" && data.result) {
+          setResult(data.result);
+
           // Create optimized prompt display immediately
           setOptimizedPrompt({
             originalTemplate: promptTemplate,
             optimizedTemplate: `${promptTemplate}
+
             ### 🎓 Few-Shot Examples (Learned by AI):
             The optimizer selected the best training examples to include in your prompt.
             These examples teach the model the correct output format and reasoning.
@@ -261,8 +261,8 @@ function App() {
             • Optimizer: Bootstrap Few-Shot
             • Teacher Model: Llama-3.3-70B (generated examples)
             • Student Model: Llama-3.1-8B (production inference)
-            • Improvement: ${data.progress.improvement_pct?.toFixed(1) || 0}%`,
-            artifactPath: data.artifact_path,
+            • Improvement: ${data.result.improvement_pct?.toFixed(1) || 0}%`,
+            artifactPath: data.result.artifact_path,
           });
 
           setStep(5);
@@ -309,7 +309,7 @@ The optimized prompt includes high-quality demonstrations selected by the 70B te
     setDataset(null);
     setPrompt(null);
     setJob(null);
-    setProgress(null);
+    setResult(null);
     setOptimizedPrompt(null);
     setSelectedExample("sentiment");
   };
@@ -631,7 +631,7 @@ The optimized prompt includes high-quality demonstrations selected by the 70B te
         </section>
 
         {/* Results */}
-        {progress && optimizedPrompt && (
+        {result && optimizedPrompt && (
           <section className="mb-8 p-6 rounded-2xl bg-gradient-to-br from-green-500/10 via-blue-500/10 to-purple-500/10 border border-green-500/30">
             <div className="flex items-center gap-4 mb-6">
               <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center text-2xl">
@@ -649,13 +649,13 @@ The optimized prompt includes high-quality demonstrations selected by the 70B te
             <div className="grid grid-cols-3 gap-4 mb-6">
               <div className="bg-gray-900/70 rounded-xl p-4 text-center">
                 <div className="text-3xl font-bold text-gray-400">
-                  {(progress.baseline_score * 100).toFixed(1)}%
+                  {(result.baseline_score * 100).toFixed(1)}%
                 </div>
                 <div className="text-sm text-gray-500 mt-1">Baseline Score</div>
               </div>
               <div className="bg-gray-900/70 rounded-xl p-4 text-center">
                 <div className="text-3xl font-bold text-green-400">
-                  {(progress.optimized_score * 100).toFixed(1)}%
+                  {(result.optimized_score * 100).toFixed(1)}%
                 </div>
                 <div className="text-sm text-gray-500 mt-1">
                   Optimized Score
@@ -664,13 +664,13 @@ The optimized prompt includes high-quality demonstrations selected by the 70B te
               <div className="bg-gray-900/70 rounded-xl p-4 text-center">
                 <div
                   className={`text-3xl font-bold ${
-                    progress.improvement_pct >= 0
+                    result.improvement_pct >= 0
                       ? "text-green-400"
                       : "text-gray-400"
                   }`}
                 >
-                  {progress.improvement_pct >= 0 ? "+" : ""}
-                  {progress.improvement_pct.toFixed(1)}%
+                  {result.improvement_pct >= 0 ? "+" : ""}
+                  {result.improvement_pct.toFixed(1)}%
                 </div>
                 <div className="text-sm text-gray-500 mt-1">Improvement</div>
               </div>

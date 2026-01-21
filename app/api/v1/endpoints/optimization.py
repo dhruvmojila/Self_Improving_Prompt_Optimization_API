@@ -154,19 +154,25 @@ async def get_optimization_job(
                 progress_pct=100.0,
                 message="Optimization completed!"
             )
-            # Store result
-            job.result = OptimizationResult(
-                job_id=job_id,
-                baseline_prompt_id=job.prompt_id,
-                optimized_prompt_id=result_data.get('artifact_path', ''),
-                baseline_score=result_data.get('baseline_score', 0),
-                optimized_score=result_data.get('optimized_score', 0),
-                improvement_pct=result_data.get('improvement_pct', 0),
-                num_trials=result_data.get('num_trials', 0),
-                best_iteration=0,
-                artifact_path=result_data.get('artifact_path', ''),
-                optimizer_type=result_data.get('optimizer_type', 'bootstrap'),
-            )
+            # Store result - wrap in separate try to catch validation errors
+            try:
+                job.result = OptimizationResult(
+                    optimized_prompt_id=result_data.get('artifact_path', 'optimized'),
+                    baseline_prompt_id=job.prompt_id,
+                    baseline_score=float(result_data.get('baseline_score', 0)),
+                    optimized_score=float(result_data.get('optimized_score', 0)),
+                    improvement_pct=float(result_data.get('improvement_pct', 0)),
+                    artifact_path=result_data.get('artifact_path', ''),
+                    optimizer_type=result_data.get('optimizer_type', 'bootstrap'),
+                    best_iteration=result_data.get('best_iteration', 0),
+                )
+                print(f"✅ Result created: {job.result}")
+            except Exception as result_error:
+                print(f"❌ Error creating result: {result_error}")
+                import traceback
+                traceback.print_exc()
+                # Still mark as completed but with raw result data
+                job.error = f"Result parsing error: {result_error}"
         elif task_result.state == 'FAILURE':
             job.status = OptimizationStatus.FAILED
             job.progress = OptimizationProgress(
@@ -182,8 +188,12 @@ async def get_optimization_job(
     except Exception as e:
         # Fallback to in-memory status if Celery unavailable
         import logging
-        logging.debug(f"Could not get Celery status: {e}")
+        import traceback
+        logging.error(f"Could not get Celery status: {e}")
+        traceback.print_exc()
     
+    print(job)
+
     return job
 
 

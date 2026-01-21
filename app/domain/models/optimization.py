@@ -124,8 +124,8 @@ class OptimizationResult(BaseModel):
     metric_breakdown: Optional[Dict[str, float]] = None
     
     # Examples that improved/regressed
-    improved_examples: List[Dict[str, Any]] = Field(default_factory=list)
-    regressed_examples: List[Dict[str, Any]] = Field(default_factory=list)
+    improved_examples: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    regressed_examples: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     
     # Changelog
     changelog: Optional[str] = Field(None, description="Natural language explanation of changes")
@@ -133,10 +133,14 @@ class OptimizationResult(BaseModel):
     # Artifact path
     artifact_path: Optional[str] = Field(None, description="Path to optimized prompt artifact")
 
-    # Optimization metadata
-    trials_run: int
-    best_trial_index: int
-    total_cost_usd: float
+    # Optimizer metadata
+    optimizer_type: Optional[str] = Field(None, description="Optimizer type")
+
+    baseline_prompt_id: Optional[str] = Field(None, description="ID of the baseline prompt")
+
+    best_iteration: Optional[int] = Field(None, description="Best iteration")
+    best_trial_index: Optional[int] = Field(None, description="Best trial index")
+    total_cost_usd: Optional[float] = Field(None, description="Total cost in USD")
 
 
 class OptimizationJob(BaseModel):
